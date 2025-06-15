@@ -3,26 +3,28 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta author="Luc Thien Phong">
+    <meta name="author" content="Luc Thien Phong">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Universe</title>
+    <style>
+        body {
+            overflow: hidden;
+            margin: 0;
+        }
+    </style>
 </head>
-<style>
-    body {
-        overflow: hidden;
-        margin: 0;
-    }
-</style>
 
 <body>
-
     <script type="module">
         import * as THREE from "https://cdn.skypack.dev/three@0.136.0";
         import { OrbitControls } from "https://cdn.skypack.dev/three@0.136.0/examples/jsm/controls/OrbitControls";
 
+        // Các biến chứa thông tin tác giả và link, được mã hóa base64
         var defined = 'QXV0aG9yOiBMdWMg';
         var datacenter = ['aHR0cHM6L', 'y93d3cuZmF', 'jZWJvb2suY29t'];
+
+        // 1. Thiết lập Scene, Camera, và Renderer
         let scene = new THREE.Scene();
         scene.background = new THREE.Color('#160016');
         let camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 1, 1000);
@@ -30,20 +32,28 @@
         let renderer = new THREE.WebGLRenderer();
         renderer.setSize(innerWidth, innerHeight);
         document.body.appendChild(renderer.domElement);
+
+        // Xử lý khi thay đổi kích thước cửa sổ
         window.addEventListener("resize", event => {
             camera.aspect = innerWidth / innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(innerWidth, innerHeight);
         })
+
         datacenter.push('L3Byb2ZpbGUu');
+        // 2. Thiết lập điều khiển (OrbitControls)
         let controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
         controls.enablePan = false;
+
         datacenter.push('cGhwP2lkPTEw');
+        // Uniform 'time' để truyền vào shader cho animation
         let gu = {
             time: { value: 0 }
         }
+
         defined = defined.concat('VGhpZW4gUGhvbmc=');
+        // Các mảng để lưu trữ thông tin của từng hạt
         let sizes = [];
         let shift = [];
         let pushShift = () => {
@@ -54,13 +64,18 @@
                 Math.random() * 0.9 + 0.1
             );
         }
+
         datacenter.push('MDA0NTQwNj');
-        var context = atob(defined);
+        var context = atob(defined); // Giải mã thông tin tác giả
+
+        // 3. Tạo các hạt
+        // Tạo một quả cầu các hạt
         let pts = new Array(50000).fill().map(p => {
             sizes.push(Math.random() * 1.5 + 0.5);
             pushShift();
             return new THREE.Vector3().randomDirection().multiplyScalar(Math.random() * 0.5 + 9.5);
         })
+        // Tạo một dải ngân hà dạng đĩa
         for (let i = 0; i < 100000; i++) {
             let r = 10, R = 40;
             let rand = Math.pow(Math.random(), 1.5);
@@ -69,11 +84,15 @@
             sizes.push(Math.random() * 1.5 + 0.5);
             pushShift();
         }
-        console.log(context);
+
+        console.log(context); // In ra "Author: Luc Thien Phong"
         datacenter.push('I2MTQ5MQ' + '==');
+
+        // 4. Tạo Geometry và Material
         let g = new THREE.BufferGeometry().setFromPoints(pts);
         g.setAttribute("sizes", new THREE.Float32BufferAttribute(sizes, 1));
         g.setAttribute("shift", new THREE.Float32BufferAttribute(shift, 4));
+
         let m = new THREE.PointsMaterial({
             size: 0.125,
             transparent: true,
@@ -86,6 +105,8 @@
                     attribute float sizes;
                     attribute vec4 shift;
                     varying vec3 vColor;
+                    // Sửa lỗi: Thêm định nghĩa cho PI2
+                    #define PI2 6.28318530718 
                     ${shader.vertexShader}
                 `.replace(
                     `gl_PointSize = size;`,
@@ -95,16 +116,16 @@
                     `#include <color_vertex>
                     float d = length(abs(position) / vec3(40., 10., 40));
                     d = clamp(d, 0., 1.);
-                    vColor = mix(vec3(42,40,154), vec3(209,124,196), d) / 255.;
+                    vColor = mix(vec3(0.16, 0.15, 0.6), vec3(0.82, 0.48, 0.77), d); // Sử dụng giá trị 0-1
                 `).replace(
-                        `#include <begin_vertex>`,
-                        `#include <begin_vertex>
+                    `#include <begin_vertex>`,
+                    `#include <begin_vertex>
                     float t = time;
                     float moveT = mod(shift.x + shift.z * t, PI2);
                     float moveS = mod(shift.y + shift.z * t, PI2);
-                    transformed += vec3(cos(moveS) * sin(moveT), cos(moveT), sin(moveS) * sin(moveT)) * shift.a;
+                    transformed += vec3(cos(moveS) * sin(moveT), cos(moveT), sin(moveS) * sin(moveT)) * shift.w; // Sửa lỗi shift.a -> shift.w
                 `);
-                // console.log(shader.vertexShader);
+                
                 shader.fragmentShader = `
                 varying vec3 vColor;
                 ${shader.fragmentShader}
@@ -114,19 +135,22 @@
                     float d = length(gl_PointCoord.xy - 0.5);
                     if (d > 0.5) discard;
                 `).replace(
-                        `vec4 diffuseColor = vec4( diffuse, opacity );`,
-                        `vec4 diffuseColor = vec4( vColor, smoothstep(0.5, 0.1, d) );`
-                    );
-                // console.log(shader.fragmentShader);
+                    `vec4 diffuseColor = vec4( diffuse, opacity );`,
+                    `vec4 diffuseColor = vec4( vColor, smoothstep(0.5, 0.1, d) );`
+                );
             }
         });
+
         let p = new THREE.Points(g, m);
         p.rotation.order = "ZYX";
         p.rotation.z = 0.2;
         scene.add(p)
-        const data = atob(datacenter.join(''));
+
+        const data = atob(datacenter.join('')); // Giải mã link facebook
         let clock = new THREE.Clock();
-        console.log(data);
+        console.log(data); // In ra link facebook
+
+        // 5. Vòng lặp Animation
         renderer.setAnimationLoop(() => {
             controls.update();
             let t = clock.getElapsedTime() * 0.5;
